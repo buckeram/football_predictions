@@ -3,17 +3,29 @@
     "app_name": "football_predictions",
     "environment_variables": {
         "S3_BUCKET": "alanbuckeridge-football",
-        "PYPPETEER_HOME": "/tmp"
+        "PYPPETEER_HOME": "/tmp",
+        "FIXTURES_URL": "https://us-central1-oddsportal-fixtures-1.cloudfunctions.net/get_fixtures",
+        "FIXTURES_DAYS": "2",
+        "LATEST_SEASON": "2021",
+        "PREVIOUS_SEASONS": "1617,1718,1819,1920",
+        "MAIN_LEAGUES": "B1, D1, E0, E2, E3, EC, F1, F2, G1, I1, N1, P1, SC0, SP1, T1",
+        "NEW_LEAGUES": "AUT, BRA, CHN, DNK, FIN, IRL, JPN, MEX, NOR, POL, ROU, RUS, SWE, SWZ, USA",
+        "S3_PREFIX_HISTORICAL": "historical"
     },
     "lambda_functions": {
         "get_fixtures": {
             "lambda_timeout": 360,
-            "lambda_memory_size": 2048
+            "lambda_memory_size": 128
+        },
+        "fetch_historical_data": {
+            "lambda_timeout": 360,
+            "lambda_memory_size": 128
         }
     },
     "stages": {
         "dev": {
-            "api_gateway_stage": "api"
+            "api_gateway_stage": "api",
+            "autogen_policy": false
         }
     }
 }

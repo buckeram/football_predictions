@@ -1,6 +1,9 @@
 {
     "version": "2.0",
     "app_name": "football_predictions",
+    "layers": [
+        "arn:aws:lambda:eu-west-1:449015435627:layer:scikit-learn:1"
+    ],
     "environment_variables": {
         "S3_BUCKET": "alanbuckeridge-football",
         "PYPPETEER_HOME": "/tmp",

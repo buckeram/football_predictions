@@ -13,7 +13,9 @@
         "PREVIOUS_SEASONS": "1617,1718,1819,1920",
         "MAIN_LEAGUES": "B1, D1, E0, E2, E3, EC, F1, F2, G1, I1, N1, P1, SC0, SP1, T1",
         "NEW_LEAGUES": "AUT, BRA, CHN, DNK, FIN, IRL, JPN, MEX, NOR, POL, ROU, RUS, SWE, SWZ, USA",
-        "S3_PREFIX_HISTORICAL": "historical"
+        "S3_PREFIX_HISTORICAL": "historical",
+        "EMAIL_SENDER": "sender@example.com",
+        "EMAIL_RECIPIENT": "recipient@example.com"
     },
     "lambda_functions": {
         "get_fixtures": {
@@ -23,6 +25,10 @@
         "fetch_historical_data": {
             "lambda_timeout": 360,
             "lambda_memory_size": 128
+        },
+        "make_predictions": {
+            "lambda_timeout": 600,
+            "lambda_memory_size": 4096
         }
     },
     "stages": {

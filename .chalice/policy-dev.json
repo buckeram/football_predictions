@@ -20,9 +20,10 @@
     },
     {
       "Action": [
-         "iam:PassRole"
+         "ses:SendEmail",
+         "ses:SendRawEmail"
       ],
-      "Resource": "arn:aws:iam::*:role/media-query-*",
+      "Resource": "*",
       "Effect": "Allow"
     }
   ]

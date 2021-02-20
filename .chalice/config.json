@@ -15,7 +15,9 @@
         "NEW_LEAGUES": "AUT, BRA, CHN, DNK, FIN, IRL, JPN, MEX, NOR, POL, ROU, RUS, SWE, SWZ, USA",
         "S3_PREFIX_HISTORICAL": "historical",
         "EMAIL_SENDER": "sender@example.com",
-        "EMAIL_RECIPIENT": "recipient@example.com"
+        "EMAIL_RECIPIENT": "recipient@example.com",
+        "PREDICTION_CUTOFF": "65",
+        "DRAW_CUTOFF": "30"
     },
     "lambda_functions": {
         "get_fixtures": {

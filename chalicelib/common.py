@@ -13,6 +13,7 @@ ODDSPORTAL_DIVISIONS = {
     ('France', 'Ligue 1'): 'F1',
     ('France', 'Ligue 2'): 'F2',
     ('Germany', 'Bundesliga'): 'D1',
+    ('Germany', '2. Bundesliga'): 'D2',
     ('Greece', 'Super League'): 'G1',
     ('Ireland', 'Premier Division'): 'IRL',
     ('Italy', 'Serie A'): 'I1',
@@ -26,6 +27,7 @@ ODDSPORTAL_DIVISIONS = {
     ('Russia', 'Premier League'): 'RUS',
     ('Scotland', 'Premiership'): 'SC0',
     ('Spain', 'LaLiga'): 'SP1',
+    ('Spain', 'LaLiga2'): 'SP2',
     ('Sweden', 'Allsvenskan'): 'SWE',
     ('Switzerland', 'Super League'): 'SWZ',
     ('Turkey', 'Super Lig'): 'T1',
@@ -89,17 +91,21 @@ ODDSPORTAL_TEAMS = {
         'Dag & Red': 'Dag and Red',
         'Dover': 'Dover Athletic',
         'Notts Co': 'Notts County',
-        'FC Halifax': 'Halifax'
+        'FC Halifax': 'Halifax',
+        "King's Lynn": "King\x92s Lynn",
+        "King’s Lynn": "King\x92s Lynn"
     },
     'E2': {
         'Peterborough': 'Peterboro',
         'Bristol Rovers': 'Bristol Rvs',
-        'Oxford Utd': 'Oxford'
+        'Oxford Utd': 'Oxford',
+        'MK Dons': 'Milton Keynes Dons'
     },
     'E3': {
         'Crawley': 'Crawley Town',
         'Cambridge Utd': 'Cambridge',
-        'Newport': 'Newport County'
+        'Newport': 'Newport County',
+        'Bradford City': 'Bradford'
     },
     'F2': {
         'AC Ajaccio': 'Ajaccio'
@@ -111,7 +117,6 @@ ODDSPORTAL_TEAMS = {
         'Schalke': 'Schalke 04',
         'Bayer Leverkusen': 'Leverkusen',
         'Hertha Berlin': 'Hertha',
-
     },
     'G1': {
         'AEL Larissa': 'Larisa',

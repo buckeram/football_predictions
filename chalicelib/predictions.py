@@ -138,7 +138,8 @@ def email_all_predictions(all_predictions_json):
                                               prediction['away_pct'], prediction['away_odds'])
 
 
-    send_mail("Football predictions (Home/Away)", mail_message)
+    LOGGER.info("Football predictions (Home/Away) \n%s", mail_message)
+    # send_mail("Football predictions (Home/Away)", mail_message)
 
 
 def email_best_predictions(all_predictions_json):
@@ -214,7 +215,11 @@ def email_draw_predictions(all_predictions_json):
         for prediction in div_predictions['predictions']:
             home_team, away_team = prediction['home_team'], prediction['away_team']
             if prediction['draw_pct'] >= cutoff:
-                draw_predictions.append({'home': home_team, 'away': away_team, 'pct': prediction['draw_pct'], 'odds': prediction['draw_odds']})
+                home_pct = prediction['home_pct']
+                away_pct = prediction['away_pct']
+                home_away_diff = abs(home_pct - away_pct)
+                if (home_pct >= 20 and home_pct < 50) and (away_pct >= 20 and away_pct < 50) and (home_away_diff < 15):
+                    draw_predictions.append({'home': home_team, 'away': away_team, 'pct': prediction['draw_pct'], 'odds': prediction['draw_odds']})
 
         if len(draw_predictions) > 0:
             mail_message += league_template % (div, league)
@@ -465,6 +470,9 @@ def get_latest_overall_ppg_for_team(data, league, team):
     n = home_counts + away_counts
 
     # Find whether the team's last match was home or away, and its index in df
+    if team not in home_teams:
+        print("Weird... {} not in home_teams".format(team))
+        print("home_teams:", home_teams)
     last_home_game_idx = len(home_teams) - home_teams[::-1].index(team) - 1
     last_away_game_idx = len(away_teams) - away_teams[::-1].index(team) - 1
 

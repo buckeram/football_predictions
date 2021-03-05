@@ -60,6 +60,11 @@ def get_fixtures(event):
     LOGGER.info("Writing fixtures to %s/%s", s3_bucket, s3_key)
     s3.Object(s3_bucket, s3_key).put(Body=subset.export('csv'))
 
+    # Temporarily make a copy to trigger the draw predictions
+    # Necessary because an S3 event for a particular file can't trigger > 1 lambda
+    # The 'right' thing would be to use an SNS topic
+    s3.Object(s3_bucket, 'fixtures/fixtures.copy').put(Body=subset.export('csv'))
+
     LOGGER.info("Done.")
 
 

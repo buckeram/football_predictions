@@ -81,7 +81,7 @@ def match_predictions(event):
         all_predictions.append(league_predictions)
 
     predictions_json = json.dumps(all_predictions)
-    # email_all_predictions(predictions_json)
+    email_all_predictions(predictions_json)
     email_best_predictions(predictions_json)
     # email_draw_predictions(predictions_json)
 

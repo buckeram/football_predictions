@@ -1,39 +1,24 @@
-import boto3
 import json
 import logging
 import numpy as np
 import os
-import re
-import requests
-import tablib
 import textwrap
-from datetime import datetime
+from . import common
+# from . import over_under_predictions
 from chalice import Blueprint
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
-from chalicelib import common
-from datetime import datetime, timezone
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
-from collections import Counter, defaultdict, deque
-from . import common
+from collections import Counter, defaultdict
 
 
 predictions = Blueprint(__name__)
 
-s3 = boto3.resource('s3')
-ses = boto3.client('ses')
-
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 
-s3_historical_prefix = os.environ['S3_PREFIX_HISTORICAL']
 main_leagues = os.environ['MAIN_LEAGUES']
 new_leagues = os.environ['NEW_LEAGUES']
-
-to_email_address = os.environ["EMAIL_RECIPIENT"]
-from_email_address = os.environ["EMAIL_SENDER"]
 
 Classifier = LinearRegression
 
@@ -43,12 +28,13 @@ Classifier = LinearRegression
 def make_predictions(event):
     LOGGER.info("Looks like there's a new fixtures file: %s/%s", event.bucket, event.key)
 
-    # Read the fixtures into CSV
-    fixtures_file = s3.Object(event.bucket, event.key).get()['Body'].read()
-    fixtures = tablib.Dataset()
-    fixtures.csv = fixtures_file.decode()
-    fixtures = fixtures.sort('Div')
+    match_predictions(event)
+    # over_under_predictions.predict_over_under(event)
 
+
+def match_predictions(event):
+    # Read the fixtures into CSV
+    fixtures = common.get_fixtures_from_s3(event.bucket, event.key)
     # Get the unique list of leagues ('Div')
     leagues = sorted(set(fixtures['Div']))
 
@@ -58,9 +44,6 @@ def make_predictions(event):
     #   Make predictions for the div
     # Send email containing predictions
 
-    all_classifiers = dict()
-    classifier_scores = dict()
-
     all_predictions = []
 
     for league in leagues:
@@ -69,7 +52,7 @@ def make_predictions(event):
             LOGGER.info("Skipping league %s", league)
             continue
 
-        past_league_matches = get_historical_data_from_s3(event.bucket, league)
+        past_league_matches = common.get_historical_data_from_s3(event.bucket, league)
         if past_league_matches is None:
             LOGGER.info("Hmm, no matches for league '%s'", league)
             continue
@@ -88,19 +71,19 @@ def make_predictions(event):
 
         classifiers = {'home_clf': home_clf, 'draw_clf': draw_clf, 'away_clf': away_clf,
             'home_fname': home_best_fname, 'draw_fname': draw_best_fname, 'away_fname': away_best_fname}
-        classifier_scores = {'home': best_home_score, 'draw': best_draw_score, 'away': best_away_score}
 
-        next_league_fixtures = get_league_data(fixtures, league)
-        next_matches = zip(next_league_fixtures['HomeTeam'], next_league_fixtures['AwayTeam'])
+        next_league_fixtures = common.get_league_data(fixtures, league)
+        next_matches = zip(next_league_fixtures['HomeTeam'], next_league_fixtures['AwayTeam'],
+                           next_league_fixtures['Date'], next_league_fixtures['Time'])
 
         predictions = predict(past_league_matches, league, classifiers, next_matches)
         league_predictions['predictions'] = predictions
         all_predictions.append(league_predictions)
 
     predictions_json = json.dumps(all_predictions)
-    email_all_predictions(predictions_json)
+    # email_all_predictions(predictions_json)
     email_best_predictions(predictions_json)
-    email_draw_predictions(predictions_json)
+    # email_draw_predictions(predictions_json)
 
 
 def email_all_predictions(all_predictions_json):
@@ -114,7 +97,7 @@ def email_all_predictions(all_predictions_json):
 
     """)
     match_template = textwrap.dedent("""
-    %s v. %s
+    %s %s -- %s v. %s
     --------------------------------------------------
     Home: %.2f   (%.2f)
     Draw: %.2f   (%.2f)
@@ -132,14 +115,15 @@ def email_all_predictions(all_predictions_json):
                                            league['draw_fname'], league['draw_score'])
 
         for prediction in league['predictions']:
-            mail_message += match_template % (prediction['home_team'], prediction['away_team'],
+            mail_message += match_template % (prediction['date'], prediction['time'],
+                                              prediction['home_team'], prediction['away_team'],
                                               prediction['home_pct'], prediction['home_odds'],
                                               prediction['draw_pct'], prediction['draw_odds'],
                                               prediction['away_pct'], prediction['away_odds'])
 
 
     LOGGER.info("Football predictions (Home/Away) \n%s", mail_message)
-    # send_mail("Football predictions (Home/Away)", mail_message)
+    common.send_mail("Football predictions (Home/Away)", mail_message)
 
 
 def email_best_predictions(all_predictions_json):
@@ -151,9 +135,10 @@ def email_best_predictions(all_predictions_json):
     """)
 
     match_template = textwrap.dedent("""
-    %s v. %s
+    %s %s -- %s v. %s
     --------------------------------------------------
     %s: %.2f   (%.2f)
+    %s
 
     """)
 
@@ -172,17 +157,32 @@ def email_best_predictions(all_predictions_json):
         for prediction in div_predictions['predictions']:
             home_team, away_team = prediction['home_team'], prediction['away_team']
             if prediction['home_pct'] >= cutoff:
-                top_predictions.append({'home': home_team, 'away': away_team, 'winner': home_team, 'pct': prediction['home_pct'], 'odds': prediction['home_odds']})
+                top_predictions.append({'home': home_team,
+                                        'away': away_team,
+                                        'winner': home_team,
+                                        'pct': prediction['home_pct'],
+                                        'odds': prediction['home_odds'],
+                                        'date': prediction['date'],
+                                        'time': prediction['time']})
             if prediction['away_pct'] >= cutoff:
-                top_predictions.append({'home': home_team, 'away': away_team, 'winner': away_team, 'pct': prediction['away_pct'], 'odds': prediction['away_odds']})
+                top_predictions.append({'home': home_team,
+                                        'away': away_team,
+                                        'winner': away_team,
+                                        'pct': prediction['away_pct'],
+                                        'odds': prediction['away_odds'],
+                                        'date': prediction['date'],
+                                        'time': prediction['time']})
 
         if len(top_predictions) > 0:
             mail_message += league_template % (div, league)
             for p in top_predictions:
-                mail_message += match_template % (p['home'], p['away'], p['winner'], p['pct'], p['odds'])
+                note = ""
+                if div == 'MEX':
+                    note = "Note: consider Double Chance"
+                mail_message += match_template % (p['date'], p['time'], p['home'], p['away'], p['winner'], p['pct'], p['odds'], note)
 
     if mail_message:
-        send_mail("Top football predictions (cutoff = %.2f%%)" % cutoff, mail_message)
+        common.send_mail("Top football predictions (cutoff = %.2f%%)" % cutoff, mail_message)
 
 
 def email_draw_predictions(all_predictions_json):
@@ -227,48 +227,12 @@ def email_draw_predictions(all_predictions_json):
                 mail_message += match_template % (p['home'], p['away'], p['pct'], p['odds'])
 
     if mail_message:
-        send_mail("Football draw predictions (cutoff = %.2f%%)" % cutoff, mail_message)
-
-
-def send_mail(subject, mail_message):
-    LOGGER.info("Sending mail (subject: %s)...", subject)
-
-    response = ses.send_email(
-        Destination={
-            'ToAddresses': [ to_email_address ]
-        },
-        Message={
-            'Body': {
-                'Text': {
-                    'Charset': 'UTF-8',
-                    'Data': mail_message,
-                }
-            },
-            'Subject': {
-                'Charset': 'UTF-8',
-                'Data': subject,
-            }
-        },
-        Source=from_email_address
-    )
-
-    LOGGER.info("Mail sent: %s", response)
-
-
-
-def get_historical_data_from_s3(bucket, league):
-    key = s3_historical_prefix.rstrip('/') + '/' + league + '.csv'
-    matches_file = s3.Object(bucket, key).get()['Body'].read()
-    # LOGGER.info("%s", matches_file)
-    matches = tablib.Dataset()
-    # matches.load(matches_file, format='csv')
-    matches.csv = matches_file.decode()
-    return matches
+        common.send_mail("Football draw predictions (cutoff = %.2f%%)" % cutoff, mail_message)
 
 
 def train_classifiers(data, league):
 
-    league_data = get_league_data(data, league)
+    league_data = common.get_league_data(data, league)
     add_ppg_fields(league_data)
 
     home_classifiers = dict()
@@ -309,14 +273,6 @@ def train_classifiers(data, league):
     return home_clf, draw_clf, away_clf, \
         best_home_score, best_draw_score, best_away_score,\
         home_best_fname, draw_best_fname, away_best_fname
-
-
-def get_league_data(data, league):
-    league_data = tablib.Dataset()
-    [league_data.append(row) for row in data if row[0] == league]
-    if type(data) == tablib.Dataset:
-        league_data.headers = data.headers
-    return league_data
 
 
 def add_ppg_fields(data):
@@ -458,7 +414,7 @@ def get_percentages_for_diffs(data, fname, ftr):
 
 
 def get_latest_overall_ppg_for_team(data, league, team):
-    league_data = get_league_data(data, league)
+    league_data = common.get_league_data(data, league)
     add_ppg_fields(league_data)
 
     home_teams = league_data['HomeTeam']
@@ -472,13 +428,16 @@ def get_latest_overall_ppg_for_team(data, league, team):
     # Find whether the team's last match was home or away, and its index in df
     if team not in home_teams:
         print("Weird... {} not in home_teams".format(team))
+        print("League: [{}]".format(league))
         print("home_teams:", home_teams)
+    # Temporary, because JPN season just started
+    if (team not in home_teams or team not in away_teams) and league in ['JPN']:
+        print("Returning 0.0 for {}".format(team))
+        return 0.0
     last_home_game_idx = len(home_teams) - home_teams[::-1].index(team) - 1
     last_away_game_idx = len(away_teams) - away_teams[::-1].index(team) - 1
 
     # Use n and the last match to calculate the 'next' PPG for the team
-    previous_ppg, points = 0, 0
-    full_time_results = league_data['FTR']
     if last_home_game_idx > last_away_game_idx:
         points = points_for_home_team(league_data['FTR'][last_home_game_idx])
         previous_ppg = league_data['HomeTeamOverallPpg'][last_home_game_idx]
@@ -490,7 +449,7 @@ def get_latest_overall_ppg_for_team(data, league, team):
 
 
 def get_latest_home_or_away_ppg_for_team(data, div, team, fname):
-    league_data = get_league_data(data, div)
+    league_data = common.get_league_data(data, div)
     add_ppg_fields(league_data)
 
     # How many matches has the team played at home/away?
@@ -498,6 +457,10 @@ def get_latest_home_or_away_ppg_for_team(data, div, team, fname):
 
     # Get the index of the last game that the team played home/away
     teams = league_data[fname]
+    # Temporary, because JPN season just started
+    if team not in teams and div in ['JPN']:
+        print("Returning 0.0 for {}".format(team))
+        return 0.0
     last_game_idx = len(teams) - teams[::-1].index(team) - 1
 
     # Use n and the last match to calculate the 'next' PPG for the team
@@ -516,16 +479,15 @@ def get_latest_away_ppg_for_team(data, div, team):
 
 
 def predict(data, league, classifiers, matches):
-    league_data = get_league_data(data, league)
+    league_data = common.get_league_data(data, league)
     subset_rows = list(range(len(league_data) - 200, len(league_data)))
     league_data = league_data.subset(rows=subset_rows)
 
-    output = ""
     predictions = []
 
     for match in matches:
 
-        home_team, away_team = match
+        home_team, away_team, date, time = match
         home_team = common.get_team_name(home_team, league)
         away_team = common.get_team_name(away_team, league)
 
@@ -554,6 +516,8 @@ def predict(data, league, classifiers, matches):
         prediction['draw_odds'] = 1/draw*100
         prediction['away_pct'] = away
         prediction['away_odds'] = 1/away*100
+        prediction['date'] = date
+        prediction['time'] = time
 
         predictions.append(prediction)
 

@@ -70,14 +70,14 @@ def _update_historical_data(s3_bucket, s3_prefix, base_url, league, latest_seaso
 
         # Get the previous seasons' data (for 'main' leagues only), combine it with latest season's data, and write to S3
         data = tablib.Dataset()
-        data.headers = ['Div', 'Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'FTR', 'PSH', 'PSD', 'PSA']
+        data.headers = ['Div', 'Season', 'Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'FTR', 'PSH', 'PSD', 'PSA', 'AvgH', 'AvgD', 'AvgA']
         if previous_seasons:
             for season in sorted([s.strip() for s in previous_seasons.split(',')]):
                 url = base_url + season
-                past_season = _download_football_data(url, league)
-                [data.append(row) for row in _extract_data(past_season, league)]
+                past_season_data = _download_football_data(url, league)
+                [data.append(row) for row in _extract_data(past_season_data, league, season)]
 
-        [data.append(row) for row in _extract_data(latest_data, league)]
+        [data.append(row) for row in _extract_data(latest_data, league, latest_season)]
 
         LOGGER.info("Writing data to %s/%s/%s.csv", s3_bucket, s3_prefix, league)
         s3object.put(Body=data.export('csv'))
@@ -85,10 +85,11 @@ def _update_historical_data(s3_bucket, s3_prefix, base_url, league, latest_seaso
         return 1
 
 
-def _extract_data(season, league):
+def _extract_data(season_data, league, season):
     data = tablib.Dataset()
-    data.csv = season.text
-    divs = [league] * data.height
+    data.csv = season_data.text
+    div = [league] * data.height
+    season = [season] * data.height
     dates = data['Date']
     home_teams = data['Home'] if 'Home' in data.headers else data['HomeTeam']
     away_teams = data['Away'] if 'Away' in data.headers else data['AwayTeam']
@@ -98,8 +99,11 @@ def _extract_data(season, league):
     pshs = data['PH'] if 'PH' in data.headers else data['PSH']
     psds = data['PD'] if 'PD' in data.headers else data['PSD']
     psas = data['PA'] if 'PA' in data.headers else data['PSA']
+    avgH = data['AvgH'] if 'AvgH' in data.headers else data['BbAvH']
+    avgD = data['AvgD'] if 'AvgD' in data.headers else data['BbAvD']
+    avgA = data['AvgA'] if 'AvgA' in data.headers else data['BbAvA']
 
-    return zip(divs, dates, home_teams, away_teams, home_goals, away_goals, results, pshs, psds, psas)
+    return zip(div, season, dates, home_teams, away_teams, home_goals, away_goals, results, pshs, psds, psas, avgH, avgD, avgA)
 
 
 def _get_historical_data_from_s3(bucket, prefix, league):

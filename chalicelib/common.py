@@ -1,3 +1,9 @@
+import boto3
+import logging
+import tablib
+import os
+
+
 # A mapping from oddsportal.com leagues to football-data.co.uk's 'Div'
 ODDSPORTAL_DIVISIONS = {
     ('England', 'Premier League'): 'E0',
@@ -46,6 +52,7 @@ DIVISIONS_TO_LEAGUES = {
     'BRA': 'Brazil Serie A',
     'DNK': 'Denmark Superligaen',
     'D1': 'Germany Bundesliga',
+    'D2': 'Germany Bundesliga 2',
     'F1': 'France Ligue 1',
     'F2': 'France Ligue 2',
     'G1': 'Greece Super League 1',
@@ -61,6 +68,7 @@ DIVISIONS_TO_LEAGUES = {
     'RUS': 'Russia Premier League',
     'SC0': 'Scotland Premiership',
     'SP1': 'Spain LaLiga',
+    'SP2': 'Spain LaLiga 2',
     'SWE': 'Sweden Allsvenskan',
     'SWZ': 'Switzerland Super League',
     'T1': 'Turkey 1 Lig',
@@ -84,7 +92,8 @@ ODDSPORTAL_TEAMS = {
         'Manchester City': 'Man City'
     },
     'E1': {
-        'Sheffield Wed': 'Sheffield Weds'
+        'Sheffield Wed': 'Sheffield Weds',
+        'Nottingham': "Nott'm Forest"
     },
     'EC': {
         'Solihull Moors': 'Solihull',
@@ -99,7 +108,8 @@ ODDSPORTAL_TEAMS = {
         'Peterborough': 'Peterboro',
         'Bristol Rovers': 'Bristol Rvs',
         'Oxford Utd': 'Oxford',
-        'MK Dons': 'Milton Keynes Dons'
+        'MK Dons': 'Milton Keynes Dons',
+        'Fleetwood': 'Fleetwood Town'
     },
     'E3': {
         'Crawley': 'Crawley Town',
@@ -117,6 +127,14 @@ ODDSPORTAL_TEAMS = {
         'Schalke': 'Schalke 04',
         'Bayer Leverkusen': 'Leverkusen',
         'Hertha Berlin': 'Hertha',
+    },
+    'D2': {
+        'Karlsruher': 'Karlsruhe',
+        'Aue': 'Erzgebirge Aue',
+        'Dusseldorf': 'Fortuna Dusseldorf',
+        'VfL Osnabruck': 'Osnabruck',
+        'St. Pauli': 'St Pauli',
+        'Hamburger SV': 'Hamburg'
     },
     'G1': {
         'AEL Larissa': 'Larisa',
@@ -140,7 +158,6 @@ ODDSPORTAL_TEAMS = {
         'Vitoria Guimaraes': 'Guimaraes',
         'SC Farense': 'Farense',
         'Braga': 'Sp Braga',
-        'SC Farense': 'Farense',
         'FC Porto': 'Porto'
     },
     'ROU': {
@@ -159,6 +176,12 @@ ODDSPORTAL_TEAMS = {
         'Real Sociedad': 'Sociedad',
         'Granada CF': 'Granada'
     },
+    'SP2': {
+        'Rayo Vallecano': 'Vallecano',
+        'Gijon': 'Sp Gijon',
+        'Espanyol': 'Espanol',
+        'R. Oviedo': 'Oviedo'
+    },
     'T1': {
         'Basaksehir': 'Buyuksehyr',
         'Goztepe': 'Goztep'
@@ -166,8 +189,69 @@ ODDSPORTAL_TEAMS = {
 }
 
 
+LOGGER = logging.getLogger()
+LOGGER.setLevel(logging.INFO)
+
+s3 = boto3.resource('s3')
+ses = boto3.client('ses')
+
+s3_historical_prefix = os.environ['S3_PREFIX_HISTORICAL']
+to_email_address = os.environ["EMAIL_RECIPIENT"]
+from_email_address = os.environ["EMAIL_SENDER"]
+
+
 def get_team_name(name, div):
     if div in ODDSPORTAL_TEAMS and name in ODDSPORTAL_TEAMS[div]:
         return ODDSPORTAL_TEAMS[div][name]
     else:
         return name
+
+
+def get_historical_data_from_s3(bucket, league):
+    key = s3_historical_prefix.rstrip('/') + '/' + league + '.csv'
+    matches_file = s3.Object(bucket, key).get()['Body'].read()
+    matches = tablib.Dataset()
+    matches.csv = matches_file.decode()
+    return matches
+
+
+def get_fixtures_from_s3(bucket, key):
+    # Read the fixtures into CSV
+    fixtures_file = s3.Object(bucket, key).get()['Body'].read()
+    fixtures = tablib.Dataset()
+    fixtures.csv = fixtures_file.decode()
+    fixtures = fixtures.sort('Div')
+    return fixtures
+
+
+def get_league_data(data, league):
+    league_data = tablib.Dataset()
+    [league_data.append(row) for row in data if row[0] == league]
+    if type(data) == tablib.Dataset:
+        league_data.headers = data.headers
+    return league_data
+
+
+def send_mail(subject, mail_message):
+    LOGGER.info("Sending mail (subject: %s)...", subject)
+
+    response = ses.send_email(
+        Destination={
+            'ToAddresses': [ to_email_address ]
+        },
+        Message={
+            'Body': {
+                'Text': {
+                    'Charset': 'UTF-8',
+                    'Data': mail_message,
+                }
+            },
+            'Subject': {
+                'Charset': 'UTF-8',
+                'Data': subject,
+            }
+        },
+        Source=from_email_address
+    )
+
+    LOGGER.info("Mail sent: %s", response)

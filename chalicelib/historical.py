@@ -2,7 +2,6 @@ import boto3
 import botocore
 import logging
 import os
-import re
 import requests
 from chalice import Blueprint
 from datetime import datetime, timezone
@@ -17,7 +16,7 @@ LOGGER.setLevel(logging.INFO)
 s3 = boto3.resource('s3')
 
 
-@history.schedule('rate(1 hour)')
+@history.schedule('cron(0 1,13 * * ? *)')
 def fetch_historical_data(event):
 
     base_url_main = 'https://www.football-data.co.uk/mmz4281/'

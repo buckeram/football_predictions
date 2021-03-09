@@ -148,7 +148,8 @@ ODDSPORTAL_TEAMS = {
         'AS Roma': 'Roma'
     },
     'I2': {
-        'Entella': 'Virtus Entella'
+        'Entella': 'Virtus Entella',
+        'L.R. Vicenza': 'Vicenza'
     },
     'N1': {
         'Venlo': 'VVV Venlo',

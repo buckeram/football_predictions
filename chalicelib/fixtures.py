@@ -41,29 +41,33 @@ def get_fixtures(event):
     data.csv = r.text
     _change_headers(data)
 
-    # Add column which represents the 'football-data' division
+    # Add column which represents the 'football-data.co.uk' division (i.e. this will contain E0, D1, MEX, etc.)
     data.lpush_col(_get_division, header='Div')
     del data['Country']
     del data['League']
 
     # Remove the rows for leagues we don't want (i.e. ones not in ODDSPORTAL_DIVISIONS)
     keepers = [i for i, row in enumerate(data) if row[0] is not None]
-    subset = data.subset(rows=keepers)
+    # If there are fixtures for 'our' leagues, then prepare the fixtures.csv file
+    if keepers:
+        subset = data.subset(rows=keepers)
 
-    subset.insert_col(5, _convert_home_team_name, 'HomeTeam')
-    subset.insert_col(6, _convert_away_team_name, 'AwayTeam')
-    del subset['oddsportalHomeTeam']
-    del subset['oddsportalAwayTeam']
+        subset.insert_col(5, _convert_home_team_name, 'HomeTeam')
+        subset.insert_col(6, _convert_away_team_name, 'AwayTeam')
+        del subset['oddsportalHomeTeam']
+        del subset['oddsportalAwayTeam']
 
-    s3_bucket = os.environ['S3_BUCKET']
-    s3_key = 'fixtures/fixtures.csv'
-    LOGGER.info("Writing fixtures to %s/%s", s3_bucket, s3_key)
-    s3.Object(s3_bucket, s3_key).put(Body=subset.export('csv'))
+        s3_bucket = os.environ['S3_BUCKET']
+        s3_key = 'fixtures/fixtures.csv'
+        LOGGER.info("Writing fixtures to %s/%s", s3_bucket, s3_key)
+        s3.Object(s3_bucket, s3_key).put(Body=subset.export('csv'))
 
-    # Temporarily make a copy to trigger the draw predictions
-    # Necessary because an S3 event for a particular file can't trigger > 1 lambda
-    # The 'right' thing would be to use an SNS topic
-    s3.Object(s3_bucket, 'fixtures/fixtures.copy').put(Body=subset.export('csv'))
+        # Temporarily make a copy to trigger the draw predictions
+        # Necessary because an S3 event for a particular file can't trigger > 1 lambda
+        # The 'right' thing would be to use an SNS topic
+        s3.Object(s3_bucket, 'fixtures/fixtures.copy').put(Body=subset.export('csv'))
+    else:
+        LOGGER.info("*** No appropriate fixtures. Not writing CSV file. ***")
 
     LOGGER.info("Done.")
 

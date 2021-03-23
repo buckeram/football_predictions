@@ -11,12 +11,12 @@
         "FIXTURES_DAYS": "2",
         "LATEST_SEASON": "2021",
         "PREVIOUS_SEASONS": "1819,1920",
-        "MAIN_LEAGUES": "B1, D1, D2, E0, E1, E2, E3, EC, F1, F2, G1, I1, I2, N1, P1, SC0, SP1, SP2, T1",
+        "MAIN_LEAGUES": "B1, D1, D2, E0, E1, E2, E3, EC, F1, F2, G1, I1, I2, N1, P1, SC0, SC1, SC2, SC3, SP1, SP2, T1",
         "NEW_LEAGUES": "AUT, BRA, CHN, DNK, FIN, IRL, JPN, MEX, NOR, POL, ROU, RUS, SWE, SWZ, USA",
         "S3_PREFIX_HISTORICAL": "historical",
         "EMAIL_SENDER": "sender@example.com",
         "EMAIL_RECIPIENT": "recipient@example.com",
-        "PREDICTION_CUTOFF": "60",
+        "PREDICTION_CUTOFF": "65",
         "DRAW_CUTOFF": "20"
     },
     "lambda_functions": {
